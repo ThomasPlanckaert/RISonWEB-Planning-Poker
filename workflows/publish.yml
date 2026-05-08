@@ -1,0 +1,64 @@
+﻿name: Publish to GitHub Packages
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'package.json' # Trigger only if package.json changes (optional)
+  release:
+    types: [created] # Also trigger on new GitHub releases
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          # Needed to fetch the tags
+          fetch-depth: 0
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          registry-url: 'https://npm.pkg.github.com/'
+          #scope: '@dedalusdiit'
+
+      - name: List npm registries
+        run: npm config list
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build package
+        run: npm run build
+      
+      - name: Build
+        run: npm run build
+
+      - name: Upload artifacts
+        id: deployment
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    needs: publish
+    steps:
+      - name: Deploy to Github Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
