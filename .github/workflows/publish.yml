@@ -3,10 +3,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'package.json' # Trigger only if package.json changes (optional)
-  release:
-    types: [created] # Also trigger on new GitHub releases
 
 jobs:
   publish:
