@@ -13,7 +13,8 @@ export function ParticipantList({ participants, votes, revealed }: ParticipantLi
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {participants.map((participant) => {
-        const hasVote = !!votes[participant.id];
+        const vote = votes[participant.id];
+        const hasVote = vote != null;
         return (
           <Card key={participant.id} className="p-4">
             <div className="flex items-center justify-between">
@@ -36,7 +37,13 @@ export function ParticipantList({ participants, votes, revealed }: ParticipantLi
                   hasVote && revealed && "bg-violet-500/25 text-violet-100"
                 )}
               >
-                {!hasVote ? "Waiting" : revealed ? votes[participant.id] : "Voted"}
+                {!hasVote
+                  ? "Waiting"
+                  : revealed
+                    ? vote === "__voted__"
+                      ? "?"
+                      : vote
+                    : "Voted"}
               </motion.div>
             </div>
           </Card>

@@ -20,6 +20,7 @@ export interface PokerSession {
   title: string;
   story: string;
   deckId: string;
+  cardSet: string[];
   participants: Participant[];
   votes: Record<string, CardValue | null>;
   revealed: boolean;
