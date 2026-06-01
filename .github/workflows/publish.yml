@@ -33,7 +33,9 @@ jobs:
         run: npm ci
 
       - name: Build
-        run: npm run build
+        run: |
+          rm -rf shared/dist shared/types/*.js shared/**/*.tsbuildinfo server/dist
+          npm run build
 
       - name: Upload artifacts
         id: deployment

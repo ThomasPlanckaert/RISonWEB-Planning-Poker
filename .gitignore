@@ -11,7 +11,10 @@ node_modules
 dist-ssr
 dist
 shared/dist
+shared/types/**/*.js
+shared/**/*.tsbuildinfo
 server/dist
+server/**/*.tsbuildinfo
 client/dist
 *.local
 

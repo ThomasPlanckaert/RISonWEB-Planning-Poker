@@ -3,7 +3,6 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "composite": true,
     "declaration": true,
     "declarationMap": true,
     "outDir": "./dist",
@@ -11,5 +10,5 @@
     "strict": true,
     "skipLibCheck": true
   },
-  "include": ["types/**/*"]
+  "include": ["types/**/*.ts"]
 }
