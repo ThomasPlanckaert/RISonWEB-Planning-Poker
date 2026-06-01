@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc -b",
+    "build": "npm run build -w @planning-poker/shared && tsc -b",
     "start": "tsx src/server.ts"
   },
   "dependencies": {

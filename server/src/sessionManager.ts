@@ -1,4 +1,4 @@
-import type { Session, SessionView } from "@planning-poker/shared";
+import type { Participant, Session, SessionView } from "@planning-poker/shared";
 import { DEFAULT_CARD_SET, VOTE_MASK } from "@planning-poker/shared";
 import { generateRoomCode, normalizeRoomCode } from "./rooms.js";
 
@@ -22,7 +22,7 @@ export class SessionManager {
     });
     const session = this.getSession(roomCode);
     if (!session) return;
-    const participant = session.participants.find((p) => p.id === participantId);
+    const participant = session.participants.find((p: Participant) => p.id === participantId);
     if (participant) participant.connected = true;
   }
 
@@ -32,7 +32,7 @@ export class SessionManager {
     this.socketBindings.delete(socketId);
 
     for (const [roomCode, session] of this.sessions) {
-      const participant = session.participants.find((p) => p.id === binding.participantId);
+      const participant = session.participants.find((p: Participant) => p.id === binding.participantId);
       if (participant) {
         participant.connected = false;
         return { roomCode, participantId: binding.participantId };
@@ -46,7 +46,7 @@ export class SessionManager {
     if (!binding) return null;
 
     for (const [roomCode, session] of this.sessions) {
-      if (session.participants.some((p) => p.id === binding.participantId)) {
+      if (session.participants.some((p: Participant) => p.id === binding.participantId)) {
         return { ...binding, roomCode };
       }
     }
@@ -96,7 +96,7 @@ export class SessionManager {
     if (!session) throw new Error("Room not found");
 
     if (participantId) {
-      const existing = session.participants.find((p) => p.id === participantId);
+      const existing = session.participants.find((p: Participant) => p.id === participantId);
       if (existing) {
         existing.connected = true;
         existing.username = username;
@@ -127,10 +127,10 @@ export class SessionManager {
     const session = this.sessions.get(binding.roomCode);
     if (!session) return null;
 
-    const participant = session.participants.find((p) => p.id === binding.participantId);
+    const participant = session.participants.find((p: Participant) => p.id === binding.participantId);
     const username = participant?.username ?? "User";
 
-    session.participants = session.participants.filter((p) => p.id !== binding.participantId);
+    session.participants = session.participants.filter((p: Participant) => p.id !== binding.participantId);
     delete session.votes[binding.participantId];
     this.socketBindings.delete(socketId);
 
@@ -161,7 +161,7 @@ export class SessionManager {
     const session = this.sessions.get(binding.roomCode);
     if (!session) throw new Error("Room not found");
 
-    const participant = session.participants.find((p) => p.id === binding.participantId);
+    const participant = session.participants.find((p: Participant) => p.id === binding.participantId);
     if (!participant) throw new Error("Participant not found");
 
     return { roomCode: binding.roomCode, session, participantId: binding.participantId };
@@ -180,10 +180,10 @@ export class SessionManager {
     const { session } = this.requireModerator(socketId);
     session.revealed = true;
 
-    const activeParticipants = session.participants.filter((p) => p.connected);
+    const activeParticipants = session.participants.filter((p: Participant) => p.connected);
     const voteValues = activeParticipants
-      .map((p) => session.votes[p.id])
-      .filter((v): v is string => !!v);
+      .map((p: Participant) => session.votes[p.id])
+      .filter((v: string | undefined): v is string => !!v);
 
     const everyoneVoted =
       activeParticipants.length > 0 && voteValues.length === activeParticipants.length;
@@ -234,10 +234,10 @@ export class SessionManager {
     if (targetId === participantId) throw new Error("Cannot kick yourself");
     if (targetId === session.moderatorId) throw new Error("Cannot kick the moderator");
 
-    const target = session.participants.find((p) => p.id === targetId);
+    const target = session.participants.find((p: Participant) => p.id === targetId);
     if (!target) throw new Error("Participant not found");
 
-    session.participants = session.participants.filter((p) => p.id !== targetId);
+    session.participants = session.participants.filter((p: Participant) => p.id !== targetId);
     delete session.votes[targetId];
 
     let kickedSocketId: string | undefined;

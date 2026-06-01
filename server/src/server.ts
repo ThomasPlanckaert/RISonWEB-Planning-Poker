@@ -3,11 +3,21 @@ import { fileURLToPath } from "node:url";
 import cors from "cors";
 import express from "express";
 import { createServer } from "node:http";
-import { Server } from "socket.io";
+import { Server, type Socket } from "socket.io";
 import type {
+  AckResponse,
+  CastVotePayload,
+  ChangeCardSetPayload,
   ClientToServerEvents,
+  CreateRoomPayload,
+  JoinRoomPayload,
+  KickParticipantPayload,
+  ResetVotesPayload,
+  RoomCreatedPayload,
+  RoomJoinedPayload,
   ServerToClientEvents,
-  SessionView
+  SessionView,
+  UpdateStoryPayload
 } from "@planning-poker/shared";
 import { SessionManager } from "./sessionManager.js";
 import { normalizeRoomCode } from "./rooms.js";
@@ -58,12 +68,14 @@ function getRoomSockets(roomCode: string): Map<string, { participantId: string }
   return result;
 }
 
-function emitToRoom<T extends keyof ServerToClientEvents>(
+function emitToRoom<E extends keyof ServerToClientEvents>(
   roomCode: string,
-  event: T,
-  ...args: Parameters<ServerToClientEvents[T]>
+  event: E,
+  ...args: Parameters<ServerToClientEvents[E]>
 ): void {
-  io.to(roomCode).emit(event, ...args);
+  const room = io.to(roomCode);
+  type EmitFn = (ev: E, ...params: Parameters<ServerToClientEvents[E]>) => void;
+  (room.emit as EmitFn)(event, ...args);
 }
 
 function handleError(socket: import("socket.io").Socket, error: unknown): void {
@@ -71,8 +83,8 @@ function handleError(socket: import("socket.io").Socket, error: unknown): void {
   socket.emit("error", { message });
 }
 
-io.on("connection", (socket) => {
-  socket.on("create_room", (payload, ack) => {
+io.on("connection", (socket: Socket<ClientToServerEvents, ServerToClientEvents>) => {
+  socket.on("create_room", (payload: CreateRoomPayload, ack?: (response: AckResponse<RoomCreatedPayload>) => void) => {
     try {
       const { roomCode, session, participantId } = sessionManager.createRoom(payload.username, {
         name: payload.name,
@@ -90,7 +102,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("join_room", (payload, ack) => {
+  socket.on("join_room", (payload: JoinRoomPayload, ack?: (response: AckResponse<RoomJoinedPayload>) => void) => {
     try {
       const { session, participantId, reconnected } = sessionManager.joinRoom(
         payload.roomCode,
@@ -129,7 +141,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("cast_vote", (payload) => {
+  socket.on("cast_vote", (payload: CastVotePayload) => {
     try {
       const session = sessionManager.castVote(socket.id, payload.vote);
       const { participantId } = sessionManager.requireParticipant(socket.id);
@@ -156,7 +168,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("reset_votes", (payload) => {
+  socket.on("reset_votes", (payload?: ResetVotesPayload) => {
     try {
       const session = sessionManager.resetVotes(socket.id, payload?.newRound ?? false);
       emitToRoom(session.id, "votes_reset");
@@ -166,7 +178,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("change_card_set", (payload) => {
+  socket.on("change_card_set", (payload: ChangeCardSetPayload) => {
     try {
       const session = sessionManager.changeCardSet(socket.id, payload.cardSet);
       emitToRoom(session.id, "card_set_changed", { cardSet: session.cardSet });
@@ -176,7 +188,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("update_story", (payload) => {
+  socket.on("update_story", (payload: UpdateStoryPayload) => {
     try {
       const session = sessionManager.updateStory(socket.id, payload);
       emitToRoom(session.id, "story_updated", payload);
@@ -186,7 +198,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("kick_participant", (payload) => {
+  socket.on("kick_participant", (payload: KickParticipantPayload) => {
     try {
       const { session, kickedParticipantId, kickedSocketId } = sessionManager.kickParticipant(
         socket.id,
