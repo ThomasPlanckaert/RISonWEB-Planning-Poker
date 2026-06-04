@@ -4,14 +4,23 @@
 
 :root {
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  color-scheme: light;
+}
+
+html.dark {
   color-scheme: dark;
 }
 
 body {
-  @apply min-h-screen bg-[radial-gradient(circle_at_top_left,_#1f1b3a_0%,_#050816_45%,_#020617_100%)] text-slate-100 antialiased;
+  @apply min-h-screen antialiased transition-colors duration-300;
+  @apply bg-gradient-to-br from-slate-100 via-violet-50 to-cyan-50 text-slate-900;
+}
+
+html.dark body {
+  @apply bg-[radial-gradient(circle_at_top_left,_#1f1b3a_0%,_#050816_45%,_#020617_100%)] text-slate-100;
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgb(139 92 246 / .6) transparent;
+  scrollbar-color: rgb(139 92 246 / 0.5) transparent;
 }

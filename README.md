@@ -1,137 +1,197 @@
-# Planning Poker (Real-Time Multiplayer)
+# Planning Poker (Firebase)
 
-A modern Planning Poker application with a React + TypeScript client and a Node.js + Socket.IO server. Multiple participants can join the same room, vote in real time, reveal estimates together, and celebrate consensus.
+Real-time Planning Poker built with React, TypeScript, TailwindCSS, Framer Motion, and **Firebase** (Hosting, Anonymous Auth, Firestore, Cloud Functions). No custom Express or Socket.IO backend.
 
-## Monorepo structure
+## Architecture
 
-```text
-/client   — React + Vite frontend (existing UI preserved)
-/server   — Express + Socket.IO backend
-/shared   — Shared TypeScript types and socket event contracts
-```
+| Layer | Technology |
+|-------|------------|
+| Frontend | React + Vite → **Firebase Hosting** |
+| Auth | **Anonymous Authentication** |
+| Data | **Cloud Firestore** (real-time listeners) |
+| Privileged actions | **Cloud Functions** (Firebase Admin SDK server-side only) |
+| Security | **Firestore Security Rules** + callable function auth |
 
-## Features
+Moderator-only operations (reveal, reset, settings, remove participant, transfer moderator) run through **HTTPS Callable Functions**. The Admin SDK is used **only inside Functions** — never in the React app.
 
-- Real-time sessions via Socket.IO rooms
-- Short shareable room codes (e.g. `AB12CD`, `TEAM42`)
-- Join existing room or create new room (creator is moderator)
-- Hidden votes until moderator reveals
-- Server-side consensus detection with confetti celebration
-- Moderator controls synchronized for all clients
-- Automatic reconnection with `localStorage` identity restore
-- Dark mode, Framer Motion animations, Tailwind styling (unchanged UX)
+Consensus is evaluated **server-side** when votes are revealed and stored on the session document (`consensusReached`, `consensusRound`, `consensusVote`).
 
 ## Prerequisites
 
 - Node.js 20+
-- npm 10+
+- [Firebase CLI](https://firebase.google.com/docs/cli): `npm install -g firebase-tools`
+- A Firebase project with Blaze plan (required for Cloud Functions; Hosting + Firestore work on Spark)
 
-## Local development
+## Firebase setup
 
-1. Install dependencies from the repository root:
+### 1. Create project
+
+1. [Firebase Console](https://console.firebase.google.com/) → Create project.
+2. **Authentication** → Sign-in method → Enable **Anonymous**.
+3. **Firestore** → Create database (production mode).
+4. **Project settings** → Your apps → Add **Web** app → copy config values.
+
+### 2. Local environment
 
 ```bash
-npm install
-```
-
-2. Copy environment examples:
-
-```bash
-cp server/.env.example server/.env
 cp client/.env.example client/.env
 ```
 
-3. Start both server and client:
+Fill in all `VITE_FIREBASE_*` values from the web app config.
+
+### 3. Link Firebase CLI
 
 ```bash
-npm run dev
+firebase login
+firebase use --add   # select your project ID
 ```
 
-- Client: http://localhost:5173
-- Server: http://localhost:3001
-- Vite proxies `/socket.io` to the server in development
-
-4. Open two browser windows (or machines), enter the same room code, and vote together.
-
-### Run packages individually
-
-```bash
-npm run dev -w @planning-poker/server
-npm run dev -w @planning-poker/client
-```
-
-## Environment variables
-
-### Server (`server/.env`)
-
-| Variable        | Default                  | Description                          |
-|----------------|--------------------------|--------------------------------------|
-| `PORT`         | `3001`                   | HTTP + Socket.IO port                |
-| `CLIENT_ORIGIN`| `http://localhost:5173`  | Allowed CORS origins (comma-separated)|
-| `NODE_ENV`     | `development`            | Set to `production` for static hosting |
-
-### Client (`client/.env`)
-
-| Variable           | Default | Description                                      |
-|--------------------|---------|--------------------------------------------------|
-| `VITE_SOCKET_URL`  | _(empty)_ | Socket server URL; leave empty to use Vite proxy |
-
-In production, set `VITE_SOCKET_URL` to your public API origin (e.g. `https://api.example.com`).
-
-## Production deployment
-
-### 1. Build
+### 4. Install dependencies
 
 ```bash
 npm install
+```
+
+### 5. Deploy rules and functions
+
+```bash
+npm run deploy:rules
+npm run deploy:functions
+```
+
+### 6. Deploy hosting (after first client build)
+
+```bash
+npm run deploy:hosting
+```
+
+Or deploy everything:
+
+```bash
+npm run deploy
+```
+
+## Service account security
+
+**Never** place Firebase Admin SDK JSON keys in the React app or commit them to git.
+
+| Environment | Admin SDK |
+|-------------|-----------|
+| Cloud Functions (production) | Uses the project’s default service account automatically |
+| Local Functions emulator | Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS` pointing to a key file **outside the repo** |
+| CI/CD | Store JSON in a secret (e.g. `FIREBASE_SERVICE_ACCOUNT`) — not in source control |
+
+`.gitignore` blocks common service account filename patterns.
+
+## Cloud Functions (moderator API)
+
+| Callable | Description |
+|----------|-------------|
+| `revealVotes` | Reveal cards + run consensus detection |
+| `resetVotes` | Clear votes; optional new round |
+| `updateSessionSettings` | Title, story, and/or card deck |
+| `removeParticipant` | Remove participant and their vote |
+| `transferModerator` | Transfer moderator role to another participant |
+
+All callables require an authenticated user and verify `moderatorUid` server-side.
+
+## Firestore structure
+
+```text
+sessions/{roomCode}
+  title, roomCode, moderatorUid, currentStory, cardSet,
+  revealed, round, consensusReached, consensusRound, consensusVote, createdAt
+
+sessions/{roomCode}/participants/{uid}
+  uid, username, isModerator, joinedAt, lastSeen
+
+sessions/{roomCode}/votes/{uid}
+  participantId, value
+```
+
+## Client-direct writes (rules-enforced)
+
+- Create session (creator = moderator)
+- Join / update own participant (`username`, `lastSeen` only)
+- Cast / update own vote (while not revealed)
+- Leave session (non-moderators)
+
+## Local development
+
+```bash
+# Terminal 1 — Firestore + Auth + Functions emulators
+firebase emulators:start
+
+# Terminal 2 — Vite dev server
+# Set VITE_USE_FIREBASE_EMULATORS=true in client/.env
+npm run dev
+```
+
+Open http://localhost:5173
+
+## Build
+
+```bash
 npm run build
 ```
 
-This builds the client into `client/dist` and compiles the server to `server/dist`.
+Outputs:
 
-### 2. Configure
+- `client/dist/` — static hosting bundle
+- `functions/lib/` — compiled Cloud Functions
 
-```bash
-# server/.env
-PORT=3001
-CLIENT_ORIGIN=https://your-frontend.example.com
-NODE_ENV=production
+## Deployment options
 
-# client/.env (at build time)
-VITE_SOCKET_URL=https://your-api.example.com
-```
-
-Rebuild the client after setting `VITE_SOCKET_URL`.
-
-### 3. Start
+### Firebase (recommended)
 
 ```bash
-npm run start
+npm run deploy
 ```
 
-With `NODE_ENV=production`, the server serves the built client from `client/dist` and handles Socket.IO on the same port.
+Deploys Hosting, Functions, and Firestore rules.
 
-### Deployment options
+### GitHub Actions
 
-- **Single host**: Run the server process behind a reverse proxy (nginx, Caddy) with WebSocket support for `/socket.io`.
-- **Split hosts**: Deploy `client/dist` to static hosting (S3, Netlify, etc.) and the server separately; set `VITE_SOCKET_URL` and `CLIENT_ORIGIN` accordingly.
+1. Create a Firebase service account with roles: **Firebase Admin**, **Cloud Functions Developer**, **Firebase Hosting Admin**.
+2. Add repository secret `FIREBASE_SERVICE_ACCOUNT` (full JSON).
+3. Add `VITE_FIREBASE_*` secrets for the build step.
+4. Example deploy step:
 
-> **Note**: Room state is stored in memory. Restarting the server clears active rooms. Use Redis or a database adapter for horizontal scaling if needed.
+```yaml
+- run: npm ci && npm run build
+- uses: google-github-actions/auth@v2
+  with:
+    credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+- run: firebase deploy --only hosting,functions,firestore:rules
+```
 
-## Socket events
+### Netlify / Vercel (hosting only)
 
-Shared typed contracts live in `shared/types/events.ts`.
+- Build: `npm run build -w @planning-poker/client`
+- Publish: `client/dist`
+- Set all `VITE_FIREBASE_*` env vars
+- Functions and rules must still be deployed via Firebase CLI
 
-**Client → Server**: `create_room`, `join_room`, `leave_room`, `cast_vote`, `reveal_votes`, `reset_votes`, `change_card_set`, `update_story`, `kick_participant`
+## Environment variables
 
-**Server → Client**: `room_created`, `room_joined`, `participant_joined`, `participant_left`, `vote_cast`, `votes_revealed`, `votes_reset`, `card_set_changed`, `story_updated`, `room_state_updated`, `consensus_reached`, `error`
+See `client/.env.example` for the full list.
 
-## Reconnection
+## Project structure
 
-`localStorage` stores only:
+```text
+client/src/
+  firebase/         App init, auth, Firestore, callable functions
+  services/         sessionService (client + callable wrappers)
+  hooks/            useSession, useParticipants, useVotes
+  features/         UI, consensus utils (display only)
+functions/src/
+  index.ts          Callable exports
+  moderator.ts      Secured moderator handlers (Admin SDK)
+  consensus.ts      Server-side consensus logic
+firestore.rules     Production security rules
+firebase.json       Hosting, Functions, emulator config
+```
 
-- `planning-poker:username`
-- `planning-poker:roomCode`
-- `planning-poker:participantId`
+## Indexes
 
-On reconnect, the client re-emits `join_room` with the stored participant id. The server is the source of truth for all session state.
+No composite indexes are required for default queries. `firestore.indexes.json` is included as an empty placeholder.

@@ -10,13 +10,18 @@ lerna-debug.log*
 node_modules
 dist-ssr
 dist
-shared/dist
-shared/types/**/*.js
-shared/**/*.tsbuildinfo
-server/dist
-server/**/*.tsbuildinfo
 client/dist
+client/.env
+.env
 *.local
+
+# Firebase — NEVER commit service account keys
+**/serviceAccount*.json
+**/*-firebase-adminsdk-*.json
+.firebaserc.local
+firebase-debug.log
+firebase-debug.*.log
+functions/lib
 
 # Editor directories and files
 .vscode/*

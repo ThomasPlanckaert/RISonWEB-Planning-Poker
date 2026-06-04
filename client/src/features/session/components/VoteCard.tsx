@@ -18,8 +18,8 @@ export function VoteCard({ value, selected, disabled, onClick }: VoteCardProps) 
       className={cn(
         "h-20 w-14 rounded-xl border text-lg font-semibold transition",
         selected
-          ? "border-violet-300 bg-violet-500 text-white shadow-lg shadow-violet-500/40"
-          : "border-white/20 bg-white/5 text-slate-100 hover:bg-white/10",
+          ? "border-violet-400 bg-violet-500 text-white shadow-lg shadow-violet-500/40"
+          : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50 dark:border-white/20 dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10",
         disabled && "cursor-not-allowed opacity-40"
       )}
     >

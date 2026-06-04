@@ -1,53 +1,59 @@
-import type { SessionView } from "@planning-poker/shared";
-import { VOTE_MASK } from "@planning-poker/shared";
+import type { FirestoreParticipant, FirestoreSession, FirestoreVote } from "../../../firebase/types";
 import type { PokerSession, Participant } from "../types/session";
 import { initials } from "./session-utils";
+import { isParticipantOnline } from "./presence";
 
-export function mapSessionView(view: SessionView, deckId: string): {
-  session: PokerSession;
-  participantId: string;
-  me: Participant;
-} {
-  const { session, votes, participantId } = view;
-  const meServer = session.participants.find((p) => p.id === participantId)!;
+export function mapFirestoreToPokerSession(
+  session: FirestoreSession,
+  participants: FirestoreParticipant[],
+  votes: FirestoreVote[],
+  myUid: string,
+  deckId: string
+): { session: PokerSession; me: Participant } {
+  const now = Date.now();
 
-  const participants: Participant[] = session.participants.map((p) => ({
-    id: p.id,
+  const uiParticipants: Participant[] = participants.map((p) => ({
+    id: p.uid,
     name: p.username,
     avatar: initials(p.username),
     isModerator: p.isModerator,
-    isActive: p.connected
+    isActive: isParticipantOnline(p.lastSeen?.toMillis() ?? null, now)
   }));
 
-  const mappedVotes: Record<string, string | null> = {};
-  for (const p of session.participants) {
-    const vote = votes[p.id];
-    if (vote === VOTE_MASK) {
-      mappedVotes[p.id] = "__voted__";
+  const voteMap: Record<string, string | null> = {};
+  for (const p of participants) {
+    const vote = votes.find((v) => v.participantId === p.uid);
+    if (!vote) {
+      voteMap[p.uid] = null;
+    } else if (session.revealed || p.uid === myUid) {
+      voteMap[p.uid] = vote.value;
     } else {
-      mappedVotes[p.id] = vote;
+      voteMap[p.uid] = "__voted__";
     }
   }
 
+  const meDoc = participants.find((p) => p.uid === myUid);
+  const me: Participant = {
+    id: myUid,
+    name: meDoc?.username ?? "You",
+    avatar: initials(meDoc?.username ?? "You"),
+    isModerator: meDoc?.isModerator ?? false,
+    isActive: meDoc ? isParticipantOnline(meDoc.lastSeen?.toMillis() ?? null, now) : true
+  };
+
   const pokerSession: PokerSession = {
-    id: session.id,
-    title: session.name ?? "Sprint Planning",
-    story: session.currentStory ?? "",
+    id: session.roomCode,
+    title: session.title,
+    story: session.currentStory,
     deckId,
     cardSet: session.cardSet,
-    participants,
-    votes: mappedVotes,
+    participants: uiParticipants,
+    votes: voteMap,
     revealed: session.revealed,
-    round: session.round
+    round: session.round,
+    consensusReached: session.consensusReached ?? false,
+    consensusRound: session.consensusRound ?? null
   };
 
-  const me: Participant = {
-    id: meServer.id,
-    name: meServer.username,
-    avatar: initials(meServer.username),
-    isModerator: meServer.isModerator,
-    isActive: meServer.connected
-  };
-
-  return { session: pokerSession, participantId, me };
+  return { session: pokerSession, me };
 }

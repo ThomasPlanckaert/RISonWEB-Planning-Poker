@@ -25,4 +25,6 @@ export interface PokerSession {
   votes: Record<string, CardValue | null>;
   revealed: boolean;
   round: number;
+  consensusReached: boolean;
+  consensusRound: number | null;
 }

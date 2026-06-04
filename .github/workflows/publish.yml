@@ -1,59 +1,44 @@
-﻿name: Publish to GitHub Packages
+name: Deploy to Firebase
 on:
   push:
     branches:
       - main-dist
 
 jobs:
-  publish:
+  deploy:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          lfs: true
-          # Needed to fetch the tags
-          fetch-depth: 0
 
-      - name: Setup Node.js environment
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
-          registry-url: 'https://npm.pkg.github.com/'
-          #scope: '@dedalusdiit'
-
-      - name: List npm registries
-        run: npm config list
+          node-version: "20"
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
 
       - name: Build
-        run: |
-          rm -rf shared/dist shared/types/*.js shared/**/*.tsbuildinfo server/dist
-          npm run build
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_FUNCTIONS_REGION: ${{ vars.VITE_FIREBASE_FUNCTIONS_REGION || 'us-central1' }}
+          VITE_BASE_PATH: ${{ vars.VITE_BASE_PATH || '/' }}
+        run: npm run build
 
-      - name: Upload artifacts
-        id: deployment
-        uses: actions/upload-pages-artifact@v3
+      - name: Authenticate to Firebase
+        uses: google-github-actions/auth@v2
         with:
-          path: client/dist/
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    needs: publish
-    steps:
-      - name: Deploy to Github Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Deploy to Firebase
+        run: firebase deploy --only hosting,functions,firestore:rules --non-interactive

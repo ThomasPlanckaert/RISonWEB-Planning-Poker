@@ -1,0 +1,106 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function sessionDoc(sessionId) {
+      return get(/databases/$(database)/documents/sessions/$(sessionId));
+    }
+
+    function sessionExists(sessionId) {
+      return sessionDoc(sessionId).exists();
+    }
+
+    function isParticipant(sessionId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/sessions/$(sessionId)/participants/$(request.auth.uid));
+    }
+
+    function isModerator(sessionId) {
+      return isSignedIn() && sessionDoc(sessionId).data.moderatorUid == request.auth.uid;
+    }
+
+    function participantUnchangedPrivileges() {
+      return request.resource.data.isModerator == resource.data.isModerator
+        && request.resource.data.uid == resource.data.uid;
+    }
+
+    function participantPresenceOnlyUpdate() {
+      return participantUnchangedPrivileges()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['username', 'lastSeen']);
+    }
+
+    function validVoteValue(sessionId) {
+      return request.resource.data.value is string
+        && request.resource.data.value.size() > 0
+        && request.resource.data.value.size() <= 20
+        && request.resource.data.value in sessionDoc(sessionId).data.cardSet;
+    }
+
+    match /sessions/{sessionId} {
+      // Session reads for authenticated members of the app
+      allow read: if isSignedIn();
+
+      // Room creation: creator becomes moderator; moderatorUid cannot be forged
+      allow create: if isSignedIn()
+        && request.resource.data.moderatorUid == request.auth.uid
+        && request.resource.data.roomCode == sessionId
+        && request.resource.data.revealed == false
+        && request.resource.data.round >= 1
+        && request.resource.data.cardSet is list
+        && request.resource.data.cardSet.size() > 0
+        && request.resource.data.consensusReached == false;
+
+      // Privileged session updates only via Cloud Functions (Admin SDK)
+      allow update, delete: if false;
+
+      match /participants/{participantId} {
+        allow read: if isSignedIn();
+
+        allow create: if isSignedIn()
+          && participantId == request.auth.uid
+          && request.resource.data.uid == request.auth.uid
+          && (
+            request.resource.data.isModerator == false
+            || (
+              request.resource.data.isModerator == true
+              && sessionDoc(sessionId).data.moderatorUid == request.auth.uid
+            )
+          );
+
+        allow update: if isSignedIn()
+          && participantId == request.auth.uid
+          && participantPresenceOnlyUpdate();
+
+        // Self-leave, or room creator removes another participant
+        allow delete: if isSignedIn()
+          && resource.data.isModerator == false
+          && (
+            participantId == request.auth.uid
+            || (isModerator(sessionId) && participantId != request.auth.uid)
+          );
+      }
+
+      match /votes/{participantId} {
+        allow read: if isSignedIn() && isParticipant(sessionId);
+
+        allow create, update: if isSignedIn()
+          && isParticipant(sessionId)
+          && participantId == request.auth.uid
+          && request.resource.data.participantId == request.auth.uid
+          && sessionDoc(sessionId).data.revealed == false
+          && validVoteValue(sessionId);
+
+        // Own vote cleared when leaving; creator may clear removed participant's vote
+        allow delete: if isSignedIn()
+          && (
+            (participantId == request.auth.uid && isParticipant(sessionId))
+            || (isModerator(sessionId) && participantId != request.auth.uid)
+          );
+      }
+    }
+  }
+}
