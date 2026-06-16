@@ -9,7 +9,7 @@ interface RoundAnnouncementProps {
 export function RoundAnnouncement({ round, onComplete }: RoundAnnouncementProps) {
   useEffect(() => {
     if (round == null) return;
-    const timer = window.setTimeout(() => onComplete?.(), 3200);
+    const timer = window.setTimeout(() => onComplete?.(), 1600);
     return () => window.clearTimeout(timer);
   }, [round, onComplete]);
 
@@ -21,7 +21,7 @@ export function RoundAnnouncement({ round, onComplete }: RoundAnnouncementProps)
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.25 }}
+          transition={{ duration: 0.15 }}
         >
           <motion.div
             className="absolute inset-0 bg-black/75 backdrop-blur-sm"
@@ -99,7 +99,7 @@ export function RoundAnnouncement({ round, onComplete }: RoundAnnouncementProps)
                 className="h-full bg-gradient-to-r from-red-600 via-amber-400 to-red-600"
                 initial={{ x: "-100%" }}
                 animate={{ x: "100%" }}
-                transition={{ duration: 1.2, delay: 0.25, ease: "easeInOut" }}
+                transition={{ duration: 0.7, delay: 0.2, ease: "easeInOut" }}
               />
             </motion.div>
           </motion.div>

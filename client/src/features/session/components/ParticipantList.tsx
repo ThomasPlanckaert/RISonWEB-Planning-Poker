@@ -3,11 +3,13 @@ import { Card } from "../../../shared/components/ui/card";
 import { Button } from "../../../shared/components/ui/button";
 import { cn } from "../../../shared/lib/utils";
 import type { Participant } from "../types/session";
+import { VOTE_GROUP_STYLES } from "../utils/vote-group-colors";
 
 interface ParticipantListProps {
   participants: Participant[];
   votes: Record<string, string | null>;
   revealed: boolean;
+  voteGroupColors?: Record<string, number>;
   canRemoveParticipants?: boolean;
   onRemoveParticipant?: (participantId: string) => void;
 }
@@ -16,6 +18,7 @@ export function ParticipantList({
   participants,
   votes,
   revealed,
+  voteGroupColors,
   canRemoveParticipants,
   onRemoveParticipant
 }: ParticipantListProps) {
@@ -24,8 +27,16 @@ export function ParticipantList({
       {participants.map((participant) => {
         const vote = votes[participant.id];
         const hasVote = vote != null;
+        const groupColorIndex = revealed ? voteGroupColors?.[participant.id] : undefined;
+        const groupStyle =
+          groupColorIndex != null ? VOTE_GROUP_STYLES[groupColorIndex] : null;
+        const displayVote = vote === "__voted__" ? "?" : vote;
+
         return (
-          <Card key={participant.id} className="p-4">
+          <Card
+            key={participant.id}
+            className={cn("p-4", groupStyle && `ring-2 ${groupStyle.ring}`)}
+          >
             <div className="flex items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="grid h-10 w-10 shrink-0 place-content-center rounded-full bg-gradient-to-br from-violet-400 to-cyan-400 text-sm font-bold text-white">
@@ -42,6 +53,11 @@ export function ParticipantList({
                         ? "Participant"
                         : "Recently disconnected"}
                   </p>
+                  {groupStyle && (
+                    <p className={cn("text-xs font-medium", groupStyle.label)}>
+                      Same vote as others ({displayVote})
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -52,7 +68,11 @@ export function ParticipantList({
                     "rounded-lg px-3 py-1 text-xs font-semibold",
                     !hasVote && "bg-slate-200/80 text-slate-600 dark:bg-white/10 dark:text-slate-300",
                     hasVote && !revealed && "bg-emerald-500/20 text-emerald-700 dark:text-emerald-200",
-                    hasVote && revealed && "bg-violet-500/25 text-violet-800 dark:text-violet-100"
+                    hasVote &&
+                      revealed &&
+                      !groupStyle &&
+                      "bg-violet-500/25 text-violet-800 dark:text-violet-100",
+                    hasVote && revealed && groupStyle && groupStyle.badge
                   )}
                 >
                   {!hasVote

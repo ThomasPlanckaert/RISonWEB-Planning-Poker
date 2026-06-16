@@ -32,6 +32,9 @@ interface UseSessionResult {
   setDeck: (deckId: string) => void;
   removeParticipant: (userId: string) => void;
   leaveRoom: () => void;
+  updateUsername: (username: string) => void;
+  endSession: () => void;
+  closeRoom: () => void;
 }
 
 export function useSession(
@@ -256,6 +259,18 @@ export function useSession(
         "Failed to remove participant"
       ),
     leaveRoom: () => {
+      void sessionService.leaveSession(code);
+      clearIdentity();
+      navigate("/");
+    },
+    updateUsername: (username) =>
+      void runAction(
+        () => sessionService.updateUsername(code, username),
+        "Failed to update display name"
+      ),
+    endSession: () =>
+      void runAction(() => sessionService.endSession(code), "Failed to end session"),
+    closeRoom: () => {
       void sessionService.leaveSession(code);
       clearIdentity();
       navigate("/");

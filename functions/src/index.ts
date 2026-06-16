@@ -1,6 +1,7 @@
 import { onCall } from "firebase-functions/v2/https";
 import { setGlobalOptions } from "firebase-functions/v2/options";
 import {
+  handleEndSession,
   handleRevealVotes,
   handleRemoveParticipant,
   handleResetVotes,
@@ -26,3 +27,4 @@ export const updateSessionSettings = onCall(callableOptions, handleUpdateSession
 /** Kept for backwards compatibility; client uses Firestore rules for removal. */
 export const removeParticipant = onCall(callableOptions, handleRemoveParticipant);
 export const transferModerator = onCall(callableOptions, handleTransferModerator);
+export const endSession = onCall(callableOptions, handleEndSession);

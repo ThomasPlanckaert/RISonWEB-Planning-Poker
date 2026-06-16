@@ -61,7 +61,13 @@ export async function createSession(username: string): Promise<string> {
     createdAt: serverTimestamp() as Timestamp,
     consensusReached: false,
     consensusRound: null,
-    consensusVote: null
+    consensusVote: null,
+    consensusStreak: 0,
+    sessionEnded: false,
+    statsConsensuses: 0,
+    statsCloseOnes: 0,
+    statsMatchCounts: {},
+    statsPairCounts: {}
   };
 
   await setDoc(sessionRef(code), session);
@@ -118,6 +124,22 @@ export async function updatePresence(roomCode: string): Promise<void> {
   if (!snap.exists()) return;
 
   await updateDoc(ref, { lastSeen: serverTimestamp() });
+}
+
+export async function updateUsername(roomCode: string, username: string): Promise<void> {
+  const uid = await requireUid();
+  const trimmed = username.trim();
+  if (trimmed.length < 2) throw new Error("Name must be at least 2 characters");
+
+  const code = normalizeRoomCode(roomCode);
+  const ref = participantRef(code, uid);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error("You are not in this room");
+
+  await updateDoc(ref, {
+    username: trimmed,
+    lastSeen: serverTimestamp()
+  });
 }
 
 export async function castVote(roomCode: string, value: string): Promise<void> {
@@ -203,6 +225,13 @@ export async function transferModerator(roomCode: string, newModeratorUid: strin
   )({
     roomCode: normalizeRoomCode(roomCode),
     newModeratorUid
+  });
+}
+
+export async function endSession(roomCode: string): Promise<void> {
+  await requireUid();
+  await callable<{ roomCode: string }, { ok: boolean }>("endSession")({
+    roomCode: normalizeRoomCode(roomCode)
   });
 }
 

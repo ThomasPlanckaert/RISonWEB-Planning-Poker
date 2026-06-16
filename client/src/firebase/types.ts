@@ -13,6 +13,12 @@ export interface FirestoreSession {
   consensusReached: boolean;
   consensusRound: number | null;
   consensusVote: string | null;
+  consensusStreak: number;
+  sessionEnded: boolean;
+  statsConsensuses: number;
+  statsCloseOnes: number;
+  statsMatchCounts: Record<string, number>;
+  statsPairCounts: Record<string, number>;
 }
 
 export interface FirestoreParticipant {

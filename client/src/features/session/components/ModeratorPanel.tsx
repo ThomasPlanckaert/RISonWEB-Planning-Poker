@@ -16,6 +16,7 @@ interface ModeratorPanelProps {
   onReveal: () => void;
   onClear: () => void;
   onNextRound: () => void;
+  onEndSession: () => void;
   onRemove: (id: string) => void;
   onAddDeck: (name: string, values: string[]) => void;
 }
@@ -30,6 +31,7 @@ export function ModeratorPanel(props: ModeratorPanelProps) {
     onReveal,
     onClear,
     onNextRound,
+    onEndSession,
     onRemove,
     onAddDeck
   } = props;
@@ -54,6 +56,11 @@ export function ModeratorPanel(props: ModeratorPanelProps) {
   const commitStory = () => {
     if (story !== session.story) onStory(story);
   };
+
+  const matchedDeck = decks.find(
+    (d) => d.values.join("|") === session.cardSet.join("|")
+  );
+  const deckSelectValue = matchedDeck?.id ?? "__session__";
 
   return (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}>
@@ -86,10 +93,17 @@ export function ModeratorPanel(props: ModeratorPanelProps) {
           placeholder="Current story (optional)"
         />
         <select
-          value={session.deckId}
-          onChange={(e) => onDeck(e.target.value)}
+          value={deckSelectValue}
+          onChange={(e) => {
+            if (e.target.value !== "__session__") onDeck(e.target.value);
+          }}
           className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 dark:border-white/15 dark:bg-white/5 dark:text-white"
         >
+          {!matchedDeck && (
+            <option className="bg-slate-900" value="__session__">
+              Custom ({session.cardSet.join(", ")})
+            </option>
+          )}
           {decks.map((deck) => (
             <option className="bg-slate-900" key={deck.id} value={deck.id}>
               {deck.name}
@@ -106,6 +120,9 @@ export function ModeratorPanel(props: ModeratorPanelProps) {
           </Button>
           <Button className="col-span-2" onClick={onNextRound}>
             Start New Round
+          </Button>
+          <Button className="col-span-2" variant="secondary" onClick={onEndSession}>
+            End Session
           </Button>
         </div>
 

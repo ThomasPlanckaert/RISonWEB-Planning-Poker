@@ -1,7 +1,9 @@
+import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import type { DocumentReference } from "firebase-admin/firestore";
 import { getAdminDb } from "./admin";
 import { evaluateConsensus } from "./consensus";
+import { analyzeRevealStats } from "./vote-stats";
 
 function normalizeRoomCode(code: string): string {
   return code.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -53,17 +55,62 @@ async function loadVotesAndParticipants(code: string) {
   return { participants, votes };
 }
 
-async function applyConsensus(code: string, revealed: boolean, round: number) {
+async function applyConsensus(
+  code: string,
+  revealed: boolean,
+  round: number,
+  previousStreak: number
+) {
   const { participants, votes } = await loadVotesAndParticipants(code);
   const result = evaluateConsensus({ revealed, participants, votes });
+
+  const nextStreak = result.reached ? previousStreak + 1 : 0;
 
   await sessionRef(code).update({
     consensusReached: result.reached,
     consensusRound: result.reached ? round : null,
-    consensusVote: result.reached ? result.vote : null
+    consensusVote: result.reached ? result.vote : null,
+    consensusStreak: nextStreak
   });
 
-  return result;
+  return { ...result, streak: nextStreak };
+}
+
+async function updateRevealStats(
+  code: string,
+  sessionData: FirebaseFirestore.DocumentData,
+  consensusReached: boolean,
+  votes: Array<{ participantId: string; value: string }>
+) {
+  const revealStats = analyzeRevealStats(votes);
+  const currentCounts =
+    (sessionData.statsMatchCounts as Record<string, number> | undefined) ?? {};
+  const currentPairCounts =
+    (sessionData.statsPairCounts as Record<string, number> | undefined) ?? {};
+  const nextCounts = { ...currentCounts };
+  const nextPairCounts = { ...currentPairCounts };
+
+  for (const uid of revealStats.matchedUids) {
+    nextCounts[uid] = (nextCounts[uid] ?? 0) + 1;
+  }
+
+  for (const key of revealStats.pairKeys) {
+    nextPairCounts[key] = (nextPairCounts[key] ?? 0) + 1;
+  }
+
+  const updates: Record<string, unknown> = {
+    statsMatchCounts: nextCounts,
+    statsPairCounts: nextPairCounts
+  };
+
+  if (consensusReached) {
+    updates.statsConsensuses = FieldValue.increment(1);
+  }
+  if (revealStats.closeOne && !consensusReached) {
+    updates.statsCloseOnes = FieldValue.increment(1);
+  }
+
+  await sessionRef(code).update(updates);
 }
 
 export async function handleRevealVotes(request: CallableRequest) {
@@ -73,9 +120,13 @@ export async function handleRevealVotes(request: CallableRequest) {
 
   const { code, data, ref } = await assertModerator(roomCode, uid);
   const round = (data.round as number) ?? 1;
+  const previousStreak = (data.consensusStreak as number) ?? 0;
+
+  const { votes } = await loadVotesAndParticipants(code);
 
   await ref.update({ revealed: true });
-  const consensus = await applyConsensus(code, true, round);
+  const consensus = await applyConsensus(code, true, round, previousStreak);
+  await updateRevealStats(code, data, consensus.reached, votes);
 
   return { ok: true, consensus };
 }
@@ -205,6 +256,17 @@ export async function handleTransferModerator(request: CallableRequest) {
   batch.update(db.doc(`sessions/${code}/participants/${uid}`), { isModerator: false });
   batch.update(newModRef, { isModerator: true });
   await batch.commit();
+
+  return { ok: true };
+}
+
+export async function handleEndSession(request: CallableRequest) {
+  const uid = requireAuth(request);
+  const roomCode = request.data?.roomCode as string | undefined;
+  if (!roomCode) throw new HttpsError("invalid-argument", "roomCode is required.");
+
+  const { ref } = await assertModerator(roomCode, uid);
+  await ref.update({ sessionEnded: true });
 
   return { ok: true };
 }

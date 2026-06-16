@@ -52,7 +52,15 @@ export function mapFirestoreToPokerSession(
     revealed: session.revealed,
     round: session.round,
     consensusReached: session.consensusReached ?? false,
-    consensusRound: session.consensusRound ?? null
+    consensusRound: session.consensusRound ?? null,
+    consensusStreak: session.consensusStreak ?? 0,
+    sessionEnded: session.sessionEnded ?? false,
+    stats: {
+      consensuses: session.statsConsensuses ?? 0,
+      closeOnes: session.statsCloseOnes ?? 0,
+      matchCounts: session.statsMatchCounts ?? {},
+      pairCounts: session.statsPairCounts ?? {}
+    }
   };
 
   return { session: pokerSession, me };

@@ -52,7 +52,8 @@ service cloud.firestore {
         && request.resource.data.round >= 1
         && request.resource.data.cardSet is list
         && request.resource.data.cardSet.size() > 0
-        && request.resource.data.consensusReached == false;
+        && request.resource.data.consensusReached == false
+        && request.resource.data.sessionEnded == false;
 
       // Privileged session updates only via Cloud Functions (Admin SDK)
       allow update, delete: if false;

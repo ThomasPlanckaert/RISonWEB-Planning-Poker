@@ -27,4 +27,12 @@ export interface PokerSession {
   round: number;
   consensusReached: boolean;
   consensusRound: number | null;
+  consensusStreak: number;
+  sessionEnded: boolean;
+  stats: {
+    consensuses: number;
+    closeOnes: number;
+    matchCounts: Record<string, number>;
+    pairCounts: Record<string, number>;
+  };
 }
